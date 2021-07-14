@@ -313,6 +313,16 @@ def two_mode(G, SS, V, l, err = 1e-16, normalize = False):
             v = v[:40]
         Gl_new = u.reshape(Tshape[0], Tshape[1], len(s))
         Gm_new = v.reshape(len(s), Tshape[2], Tshape[3])
+        for j in range(len(s)):
+            temp2 = np.tensordot(np.diag(SS[l-1]),Gl_new,(0,0))[...,j]
+            coefGl = np.sqrt(np.sum(np.conj(temp2)*temp2))
+            Gl_new[...,j] = Gl_new[...,j]/coefGl
+            s[j] = s[j]*coefGl.real
+        for j in range(len(s)):
+            temp2 = np.tensordot(Gm_new,np.diag(SS[l+1]),(-1,0))[j]
+            coefGm = np.sqrt(np.sum(np.conj(temp2)*temp2))
+            Gm_new[j] = Gm_new[j]/coefGm
+            s[j] = s[j]*coefGm.real
         recrTheta = np.tensordot(np.tensordot(Gl_new, np.diag(s),(2,0)), Gm_new, (2,0))
     elif l == 0:
         Theta = np.einsum('jklm,jka->lma',np.tensordot(Gl, V,(0,0)),Gm)
@@ -323,6 +333,11 @@ def two_mode(G, SS, V, l, err = 1e-16, normalize = False):
         Gl_new = u
         Gm_new = v.reshape(len(s), Tshape[1], Tshape[2])
         recrTheta = np.tensordot(np.tensordot(Gl_new, np.diag(s),(1,0)), Gm_new, (1,0))
+        for j in range(len(s)):
+            temp2 = np.tensordot(Gm_new,np.diag(SS[l+1]),(-1,0))[j]
+            coefGm = np.sqrt(np.sum(np.conj(temp2)*temp2))
+            Gm_new[j] = Gm_new[j]/coefGm
+            s[j] = s[j]*coefGm.real
     elif l == len(G) - 2:
         Theta = np.einsum('ijklm,jk->ilm',np.tensordot(Gl, V,(1,0)),Gm)
         Tshape = Theta.shape
@@ -332,6 +347,11 @@ def two_mode(G, SS, V, l, err = 1e-16, normalize = False):
         Gl_new = u.reshape(Tshape[0], Tshape[1], len(s))
         Gm_new = v
         recrTheta = np.tensordot(np.tensordot(Gl_new, np.diag(s),(2,0)), Gm_new, (2,0))
+        for j in range(len(s)):
+            temp2 = np.tensordot(np.diag(SS[l-1]),Gl_new,(0,0))[...,j]
+            coefGl = np.sqrt(np.sum(np.conj(temp2)*temp2))
+            Gl_new[...,j] = Gl_new[...,j]/coefGl
+            s[j] = s[j]*coefGl.real
     tot = np.sqrt(np.sum(np.conj(s)*s))
     #s = s/tot
     #G[l] = Gl_new*tot
