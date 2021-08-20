@@ -14,9 +14,11 @@ from scipy import linalg as SLA
 from MPS_MPO_fix import *
 import matplotlib.pyplot as plt
 import pickle
+import concurrent.futures
 import time
 
 st = time.time()
+
 
 #Attemp for Time evalution
 L = 10. #For the total length
@@ -71,6 +73,21 @@ for i in range(len(Gamma)):
     sqs = np.sqrt(np.sum(np.conj(Gamma[i])*Gamma[i]))
     Gamma[i] = Gamma[i]/sqs
 S = [np.array([1. + 0.j]) for i in range(N-1)]
+'''
+for i in range(len(S)):
+    S[i] = S[i]/np.sqrt(np.sum(np.power(S[i],2)))
+'''
+jointloc = 0
+
+
+'''
+rdfname = 'fixed8010_0001t1000p100.p'
+with open(rdfname, 'rb') as f2:
+    Gamma = pickle.load(f2)[-1]
+    S = pickle.load(f2)[-1]
+
+jointloc = rdfname[:-2].split('t')[1].split('p')[0]
+'''
 
 G_tevlt = [Gamma]
 S_tevlt = [S]
@@ -79,28 +96,86 @@ S_tevlt = [S]
 G_0 = [np.copy(g) for g in G_tevlt[-1]]
 S_0 = [np.copy(s) for s in S_tevlt[-1]]
 
+#Trying plot the Envelope of initial state:
+'''
+xp = np.linspace(-deltaz/2, deltaz/2, 100)
+yp = xp - xp
+for i in range(len(Gamma[0])):
+    coe = Gamma[0][i][0]
+    for xind in range(len(xp)):
+        #yp[xind] += coe * np.sin(np.pi*(i+1)*(xp[xind] + deltaz/2)/deltaz)
+        #yp[xind] += coe.real * i
+        yp[xind] += (coe* np.conj(coe)).real * i
+
+plt.plot(xp - deltaz*N/2,yp)
+for b in range(1,N-1):
+    xp = np.linspace(-deltaz/2, deltaz/2, 100)
+    yp = xp - xp
+    for i in range(len(Gamma[b][0])):
+        coe = Gamma[b][0][i][0]
+        for xind in range(len(xp)):
+            #yp[xind] += coe * np.sin(np.pi*(i+1)*(xp[xind] + deltaz/2)/deltaz)
+            #yp[xind] += coe.real * i
+            yp[xind] += (coe* np.conj(coe)).real * i
+    plt.plot(xp + deltaz*(b-N/2),yp)
+    print('=============',max(yp))
+
+xp = np.linspace(-deltaz/2, deltaz/2, 100)
+yp = xp - xp
+for i in range(len(Gamma[N-1][0])):
+    coe = Gamma[N-1][0][i]
+    for xind in range(len(xp)):
+        #yp[xind] += coe * np.sin(np.pi*(i+1)*(xp[xind] + deltaz/2)/deltaz)
+        #yp[xind] += coe.real * i
+        yp[xind] += (coe* np.conj(coe)).real * i
+plt.plot(xp + deltaz*(N/2-1),yp)
+
+
+xx = np.linspace(-L/2, L/2, 100)
+fint = 0.0
+xxxp = np.linspace(-5,5,100)
+for i in xxxp:
+    fint += 0.1* (nbar/2)/(np.cosh(loc*nbar/2))
+
+plt.plot(xx, (nbar/2)/(np.cosh(xx*nbar/2))*fint)
+'''
+
+
+
+
 
 xpoint = np.array(xpoint)
 
 def plotMPS(Gamma, S, xpoint):
-    #The function plot the photon density plot with input MPS and x scale
     ypoint = xpoint-xpoint
+    #Gammatemp = np.tensordot(np.tensordot(Gamma[0], np.diag(S[0]), (-1,0)), np.diag(np.array(range(n))),(0,0))
     Gammatemp = np.tensordot(Gamma[0], np.diag(S[0]), (-1,0))
+    #ypoint[0] += np.sum(np.tensordot(np.real(Gammatemp*np.conj(Gammatemp)), np.diag(np.array(range(n))),(0,0)))
     ypoint[0] += np.sum(np.tensordot(np.real(Gammatemp*np.conj(Gammatemp)), np.diag(np.array(range(n))),(0,0)))
+    
     for i in range(1,N-1):
+        #Gammatemp = np.tensordot(np.tensordot(np.diag(S[i-1]), np.tensordot(Gamma[i], np.diag(S[i]), (-1,0)), (-1,0)), np.diag(np.array(range(n))),(1,0))
         Gammatemp = np.tensordot(np.diag(S[i-1]), np.tensordot(Gamma[i], np.diag(S[i]), (-1,0)), (-1,0))
+        #ypoint[i] += np.sum(np.tensordot(np.real(Gammatemp*np.conj(Gammatemp)), np.diag(np.array(range(n))),(1,0)))
         ypoint[i] += np.sum(np.tensordot(np.real(Gammatemp*np.conj(Gammatemp)), np.diag(np.array(range(n))),(1,0)))
+    
+    #Gammatemp = np.tensordot(np.tensordot(np.diag(S[N-2]), Gamma[N-1], (-1,0)), np.diag(np.array(range(n))),(1,0))
     Gammatemp = np.tensordot(np.diag(S[N-2]), Gamma[N-1], (-1,0))
+    #ypoint[N-1] += np.sum(Gammatemp*np.conj(Gammatemp))
+    #ypoint[N-1] += np.sum(np.tensordot(np.real(Gammatemp*np.conj(Gammatemp)), np.diag(np.array(range(n))),(1,0)))
     ypoint[N-1] += np.sum(np.tensordot(np.real(Gammatemp*np.conj(Gammatemp)), np.diag(np.array(range(n))),(1,0)))
+    #plt.plot(xpoint,ypoint*10/sum(ypoint))
+    #plt.plot(xpoint,ypoint/np.sum(ypoint))
     plt.plot(xpoint,ypoint)
-    
-    
+    print(ypoint, np.sum(ypoint),'~~~~~~~~~~~~~~~~~~~')
+
 plotMPS(Gamma, S, xpoint)
 
-Uspm = SLA.expm(- 1.j * deltat *SPM)        #Defining the time evolution of hamiltonians
+Uspm = SLA.expm(- 1.j * deltat *SPM)
 Udis = SLA.expm(- 1.j * deltat * dispsn.reshape(n*n, n*n)).reshape(n,n,n,n)
 Gtemp = [np.copy(g) for g in G_tevlt[-1]]
 Stemp = [np.copy(s) for s in S_tevlt[-1]]
+
 for i in range(it):
     print('Working on iteration', i)
     '''
@@ -111,19 +186,55 @@ for i in range(it):
     for j in range(N):
         Gtemp,Stemp = one_mode(Gtemp,Stemp,Uspm,j)
     #Even dispersion part (Notice our index start from 0)
-    ttemp = time.time()
-    for j in range(0,N-1,2):
+    ttemp = time.perf_counter()
+    
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+    executor.map(f, range(N), range(N))
+    for j in range(0, N - 1, 2):
+        t = threading.Thread(target=two_mode_o, args=[Gtemp, Stemp, Udis, j])
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
+    print('The even ones takes', time.perf_counter() - ttemp)
+    threads = []
+    for j in range(1, N - 1, 2):
+        t = threading.Thread(target=two_mode_o, args=[Gtemp, Stemp, Udis, j])
+        t.start()
+        threads.append(t)
+    
+    for t in threads:
+        t.join()
+    '''
+    for j in range(N-1):
         Gtemp,Stemp = two_mode(Gtemp,Stemp,Udis,j)
-    print('The even dispersion calculation takes', time.time()-ttemp)
-    for j in range(1,N-1,2):
-        Gtemp,Stemp = two_mode(Gtemp,Stemp,Udis,j)
-    #We will save and plot every 100 iteration (per 0.1 sec)
+    '''
+    '''
+    #Normalizing S for good ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    for i in range(len(Stemp)):
+        Stemp[i] = Stemp[i]/np.sqrt(np.sum(np.power(Stemp[i],2)))
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    '''
+    '''
+    #Testing part don't run~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    recreat = Gtemp[0]
+    for i in range(1, N):
+        recreat = np.tensordot(recreat, np.diag(Stemp[i-1]), (-1,0))
+        recreat = np.tensordot(recreat, Gtemp[i], (-1,0))
+    print('The c norm is',np.sqrt(np.sum(np.conj(recreat) * recreat)))
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    '''
+    '''
+    G_tevlt.append(Gtemp)
+    S_tevlt.append(Stemp)
+    '''
     if i % 100 == 0:
         print('Will plot', i)    
         G_tevlt.append(Gtemp)
         S_tevlt.append(Stemp)
         plotMPS(Gtemp, Stemp, xpoint)
-
+    #Even dispersion part
+    plt.savefig('Test'+str(N)+str(n)+str(deltat)+'.png')
 '''
 #fname = '60fixed'+str(N)+str(n)+'_'+str(deltat).replace('.', '')+'j'+str(jointloc)+'t'+str(it)+'p100'+'.p'
 fname = 'c50fixed'+str(N)+str(n)+'_'+str(deltat).replace('.', '')+'t'+str(it)+'p100'+'.p'
